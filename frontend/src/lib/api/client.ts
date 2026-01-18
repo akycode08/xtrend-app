@@ -24,6 +24,8 @@ export const apiClient = axios.create({
   headers: {
     'Content-Type': 'application/json',
   },
+  // Увеличиваем таймаут для Render Free Tier (может "просыпаться" до 60 секунд)
+  timeout: 90000, // 90 секунд
 });
 
 apiClient.interceptors.response.use(
@@ -39,9 +41,16 @@ apiClient.interceptors.response.use(
       });
     } else if (error.request) {
       // Запрос был отправлен, но ответа не получено
+      // Это может быть из-за того, что Render Free Tier "спит" (пробуждение занимает ~50 секунд)
+      const isTimeout = error.code === 'ECONNABORTED' || error.message.includes('timeout');
+      const message = isTimeout 
+        ? 'Backend server is waking up (Render Free Tier). This may take up to 60 seconds. Please try again.'
+        : 'Backend server may be down or unreachable';
+      
       console.error('API Error: No response from server', {
         url: error.config?.url,
-        message: 'Backend server may be down or unreachable'
+        message,
+        errorCode: error.code
       });
     } else {
       // Ошибка при настройке запроса
