@@ -164,8 +164,14 @@ export default function Home() {
       }
     } catch (err: any) {
       console.error('Search error details:', err);
-      const errorMessage = err.response?.data?.message || err.message || 'Ошибка связи с сервером';
-      setError(`Ошибка: ${errorMessage}. Проверьте, что backend запущен на http://localhost:8000`);
+      let errorMessage = err.response?.data?.message || err.message || 'Ошибка связи с сервером';
+      
+      // Улучшаем сообщение для timeout ошибок (Render Free Tier "просыпается")
+      if (err.code === 'ECONNABORTED' || err.message?.includes('timeout')) {
+        errorMessage = 'Сервер просыпается (Render Free Tier может занимать до 2 минут). Пожалуйста, подождите немного и попробуйте снова.';
+      }
+      
+      setError(`Ошибка: ${errorMessage}`);
     } finally { setLoading(false); }
   };
 

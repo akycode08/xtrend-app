@@ -25,8 +25,8 @@ export const apiClient = axios.create({
   headers: {
     'Content-Type': 'application/json',
   },
-  // Увеличиваем таймаут для Render Free Tier (может "просыпаться" до 60 секунд)
-  timeout: 90000, // 90 секунд
+  // Увеличиваем таймаут для Render Free Tier (может "просыпаться" до 90+ секунд)
+  timeout: 120000, // 120 секунд (2 минуты)
 });
 
 apiClient.interceptors.response.use(
