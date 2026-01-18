@@ -164,14 +164,20 @@ export default function Home() {
       }
     } catch (err: any) {
       console.error('Search error details:', err);
+      console.error('Full error object:', JSON.stringify(err, null, 2));
+      
       let errorMessage = err.response?.data?.message || err.message || 'Ошибка связи с сервером';
       
-      // Улучшаем сообщение для timeout ошибок (Render Free Tier "просыпается")
+      // Улучшаем сообщение для timeout и network ошибок (Render Free Tier "просыпается")
       if (err.code === 'ECONNABORTED' || err.message?.includes('timeout')) {
-        errorMessage = 'Сервер просыпается (Render Free Tier может занимать до 2 минут). Пожалуйста, подождите немного и попробуйте снова.';
+        errorMessage = '⏳ Сервер просыпается (Render Free Tier может занимать до 2 минут). Пожалуйста, подождите 30-60 секунд и попробуйте снова.';
+      } else if (err.message?.includes('Network Error') || err.code === 'ERR_NETWORK' || (!err.response && !err.request)) {
+        errorMessage = '🌙 Сервер спит (Render Free Tier). Первый запрос может занять 30-90 секунд. Пожалуйста, подождите 1 минуту и попробуйте снова. Это нормально для бесплатного тарифа Render.';
+      } else if (!err.response && err.request) {
+        errorMessage = '⏳ Запрос отправлен, но сервер не отвечает. Возможно, сервер просыпается. Подождите 30-60 секунд и попробуйте снова.';
       }
       
-      setError(`Ошибка: ${errorMessage}`);
+      setError(errorMessage);
     } finally { setLoading(false); }
   };
 
