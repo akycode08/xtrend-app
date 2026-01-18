@@ -13,3 +13,4 @@ transformers
 torch
 pillow
 numpy
+scikit-learn
