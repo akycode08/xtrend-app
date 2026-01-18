@@ -1,0 +1,83 @@
+name: Conditional Render Deploy
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch: # Позволяет запускать вручную
+
+jobs:
+  check-changes:
+    runs-on: ubuntu-latest
+    outputs:
+      backend-changed: ${{ steps.filter.outputs.backend }}
+      frontend-changed: ${{ steps.filter.outputs.frontend }}
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2 # Нужно для сравнения с предыдущим коммитом
+      
+      - name: Check for backend changes
+        id: filter
+        uses: dorny/paths-filter@v2
+        with:
+          filters: |
+            backend:
+              - 'backend/**'
+            frontend:
+              - 'frontend/**'
+
+  deploy-to-render:
+    needs: check-changes
+    runs-on: ubuntu-latest
+    # Деплоим только если были изменения в backend
+    if: needs.check-changes.outputs.backend-changed == 'true'
+    
+    steps:
+      - name: Trigger Render Deployment via API
+        env:
+          RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+          RENDER_SERVICE_ID: ${{ secrets.RENDER_SERVICE_ID }}
+        run: |
+          if [ -z "$RENDER_API_KEY" ] || [ -z "$RENDER_SERVICE_ID" ]; then
+            echo "⚠️  Warning: RENDER_API_KEY or RENDER_SERVICE_ID not set in GitHub Secrets"
+            echo "📝 Please add them in: Settings → Secrets and variables → Actions"
+            echo "ℹ️  Render will deploy automatically via webhook (without this control)"
+            exit 0
+          fi
+          
+          echo "🚀 Backend changes detected. Triggering Render deployment via API..."
+          
+          RESPONSE=$(curl -s -w "\n%{http_code}" -X POST \
+            "https://api.render.com/v1/services/${RENDER_SERVICE_ID}/deploys" \
+            -H "Authorization: Bearer ${RENDER_API_KEY}" \
+            -H "Accept: application/json" \
+            -H "Content-Type: application/json")
+          
+          HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
+          BODY=$(echo "$RESPONSE" | sed '$d')
+          
+          if [ "$HTTP_CODE" -eq 201 ] || [ "$HTTP_CODE" -eq 200 ]; then
+            echo "✅ Render deployment triggered successfully!"
+            echo "Response: $BODY"
+          else
+            echo "❌ Failed to trigger Render deployment"
+            echo "HTTP Code: $HTTP_CODE"
+            echo "Response: $BODY"
+            exit 1
+          fi
+
+  skip-deploy:
+    needs: check-changes
+    runs-on: ubuntu-latest
+    # Пропускаем деплой если изменения только во frontend
+    if: needs.check-changes.outputs.backend-changed == 'false' && needs.check-changes.outputs.frontend-changed == 'true'
+    
+    steps:
+      - name: Skip Render Deployment
+        run: |
+          echo "⏭️  Skipping Render deployment - only frontend changes detected"
+          echo "ℹ️  Changes in frontend/: ${{ needs.check-changes.outputs.frontend-changed }}"
+          echo "✅ Vercel will handle frontend deployment automatically"
