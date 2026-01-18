@@ -43,15 +43,22 @@ apiClient.interceptors.response.use(
     } else if (error.request) {
       // Запрос был отправлен, но ответа не получено
       // Это может быть из-за того, что Render Free Tier "спит" (пробуждение занимает ~50 секунд)
-      const isTimeout = error.code === 'ECONNABORTED' || error.message.includes('timeout');
-      const message = isTimeout 
-        ? 'Backend server is waking up (Render Free Tier). This may take up to 60 seconds. Please try again.'
-        : 'Backend server may be down or unreachable';
+      const isTimeout = error.code === 'ECONNABORTED' || error.message?.includes('timeout');
+      const isNetworkError = error.message?.includes('Network Error') || !error.response && !error.request;
+      
+      let message = 'Backend server may be down or unreachable';
+      if (isTimeout) {
+        message = 'Backend server is waking up (Render Free Tier). This may take up to 2 minutes. Please wait and try again.';
+      } else if (isNetworkError) {
+        message = 'Network error: Cannot reach backend server. The server may be sleeping (Render Free Tier). Please wait 30-60 seconds and try again.';
+      }
       
       console.error('API Error: No response from server', {
         url: error.config?.url,
         message,
-        errorCode: error.code
+        errorCode: error.code,
+        errorMessage: error.message,
+        fullError: error
       });
     } else {
       // Ошибка при настройке запроса
