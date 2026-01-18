@@ -12,13 +12,47 @@ type DeepSubMode = 'keywords' | 'username';
 
 const SafeImage = ({ src, alt, className }: { src: string | null | undefined, alt: string, className?: string }) => {
   const [hasError, setHasError] = useState(false);
-  if (!src || hasError) return (
+  
+  // Функция для получения базового URL бэкенда
+  const getBackendUrl = () => {
+    if (typeof window === 'undefined') return 'https://xtrend-app.onrender.com';
+    // Если работаем локально
+    if (window.location.hostname === 'localhost') {
+      return 'http://localhost:8000';
+    }
+    // Для production используем Render URL
+    return 'https://xtrend-app.onrender.com';
+  };
+
+  // Используем прокси для TikTok изображений
+  const getImageUrl = (url: string | null | undefined) => {
+    if (!url) return null;
+    // Проверяем все варианты TikTok CDN доменов (любой домен с tiktokcdn)
+    if (url.includes('tiktokcdn')) {
+      // Используем прокси через backend
+      const backendUrl = getBackendUrl();
+      return `${backendUrl}/api/images/proxy?url=${encodeURIComponent(url)}`;
+    }
+    return url;
+  };
+  
+  const imageUrl = getImageUrl(src);
+  
+  if (!imageUrl || hasError) return (
     <div className={`flex items-center justify-center bg-zinc-800 text-zinc-600 ${className}`}>
       <ImageOff className="w-6 h-6 opacity-20" />
     </div>
   );
+  
   return (
-    <img src={src} alt={alt} className={className} referrerPolicy="no-referrer" loading="lazy" onError={() => setHasError(true)} />
+    <img 
+      src={imageUrl} 
+      alt={alt} 
+      className={className} 
+      referrerPolicy="no-referrer" 
+      loading="lazy" 
+      onError={() => setHasError(true)}
+    />
   );
 };
 
@@ -82,13 +116,38 @@ export default function Home() {
     };
   }, [videoList.length, activeTab, query]);
 
+  const extractUsername = (input: string): string => {
+    // Извлекает username из URL или возвращает как есть, если уже username
+    const trimmed = input.trim();
+    
+    // Если это URL TikTok, извлекаем username
+    const urlMatch = trimmed.match(/tiktok\.com\/@([^/?]+)/);
+    if (urlMatch) {
+      return urlMatch[1];
+    }
+    
+    // Если начинается с @, убираем его
+    if (trimmed.startsWith('@')) {
+      return trimmed.substring(1);
+    }
+    
+    // Иначе возвращаем как есть (уже username)
+    return trimmed;
+  };
+
   const handleSearch = async () => {
     if (!query.trim()) return;
     setLoading(true); setError(''); setVideoList([]);
 
     try {
       if (activeTab === 'profiles') {
-        const response = await apiClient.get(`/profiles/${query}`);
+        const username = extractUsername(query);
+        if (!username) {
+          setError('Введите username или URL профиля TikTok');
+          setLoading(false);
+          return;
+        }
+        const response = await apiClient.get(`/profiles/${username}`);
         setCurrentReport(response.data);
         setSessionHistory(prev => [response.data, ...prev.filter(p => p.author.username !== response.data.author.username)]);
       } 
@@ -104,7 +163,9 @@ export default function Home() {
         setVideoList(response.data.items || []);
       }
     } catch (err: any) {
-      setError('Ошибка связи с сервером. Проверьте запуск бэкенда.');
+      console.error('Search error details:', err);
+      const errorMessage = err.response?.data?.message || err.message || 'Ошибка связи с сервером';
+      setError(`Ошибка: ${errorMessage}. Проверьте, что backend запущен на http://localhost:8000`);
     } finally { setLoading(false); }
   };
 
