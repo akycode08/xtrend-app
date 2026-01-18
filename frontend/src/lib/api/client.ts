@@ -13,6 +13,12 @@ const getApiUrl = () => {
 
 const API_URL = getApiUrl();
 
+// Для отладки: показываем какой URL используется
+if (typeof window !== 'undefined') {
+  console.log('🔗 API URL:', API_URL);
+  console.log('📍 Hostname:', window.location.hostname);
+}
+
 export const apiClient = axios.create({
   baseURL: API_URL,
   headers: {
