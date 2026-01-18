@@ -2,6 +2,7 @@ import axios from 'axios';
 
 // Адрес твоего Python-сервера
 // Использует localhost для разработки, Render URL для production
+// Updated: Using Render URL for production deployments
 const getApiUrl = () => {
   // Если работаем локально (на вашем компьютере)
   if (typeof window !== 'undefined' && window.location.hostname === 'localhost') {
