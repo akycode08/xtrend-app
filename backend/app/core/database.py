@@ -22,9 +22,12 @@ Base = declarative_base()
 def get_db():
     db = SessionLocal()
     try:
-        # Активируем расширение vector для работы с эмбеддингами
-        db.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
-        db.commit()
+        # Активируем расширение vector для работы с эмбеддингами (только если нужно)
+        # Убрано из get_db() - выполняется только при создании таблиц
         yield db
+    except Exception as e:
+        db.rollback()
+        print(f"❌ Database error in get_db(): {e}")
+        raise
     finally:
         db.close()
